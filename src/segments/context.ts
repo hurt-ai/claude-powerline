@@ -110,7 +110,7 @@ export class ContextProvider {
           Math.max(0, Math.round((contextLength / contextLimit) * 100))
         );
 
-        const usableLimit = Math.round(contextLimit * 0.75);
+        const usableLimit = contextLimit;
         const usablePercentage = Math.min(
           100,
           Math.max(0, Math.round((contextLength / usableLimit) * 100))

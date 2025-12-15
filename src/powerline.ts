@@ -637,6 +637,28 @@ export class PowerlineRenderer {
     const metrics = getSegmentColors("metrics");
     const version = getSegmentColors("version");
 
+    const warningThemeColors = colorTheme.warning || { bg: "#cc0000", fg: "#ffffff" };
+    const warning = (() => {
+      if (colorSupport === "none") {
+        return { bg: "", fg: "" };
+      } else if (colorSupport === "ansi") {
+        return {
+          bg: hexToBasicAnsi(warningThemeColors.bg, true),
+          fg: hexToBasicAnsi(warningThemeColors.fg, false),
+        };
+      } else if (colorSupport === "ansi256") {
+        return {
+          bg: hexTo256Ansi(warningThemeColors.bg, true),
+          fg: hexTo256Ansi(warningThemeColors.fg, false),
+        };
+      } else {
+        return {
+          bg: hexToAnsi(warningThemeColors.bg, true),
+          fg: hexToAnsi(warningThemeColors.fg, false),
+        };
+      }
+    })();
+
     return {
       reset: colorSupport === "none" ? "" : RESET_CODE,
       modeBg: directory.bg,
@@ -659,6 +681,8 @@ export class PowerlineRenderer {
       metricsFg: metrics.fg,
       versionBg: version.bg,
       versionFg: version.fg,
+      warningBg: warning.bg,
+      warningFg: warning.fg,
     };
   }
 

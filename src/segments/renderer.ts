@@ -34,6 +34,7 @@ export interface TmuxSegmentConfig extends SegmentConfig {}
 
 export interface ContextSegmentConfig extends SegmentConfig {
   showPercentageOnly?: boolean;
+  warningThreshold?: number;
 }
 
 export interface MetricsSegmentConfig extends SegmentConfig {
@@ -331,22 +332,24 @@ export class SegmentRenderer {
   ): SegmentData | null {
     if (!contextInfo) {
       return {
-        text: `${this.symbols.context_time} 0 (100%)`,
+        text: `${this.symbols.context_time} 0 (0%)`,
         bgColor: colors.contextBg,
         fgColor: colors.contextFg,
       };
     }
 
-    const contextLeft = `${contextInfo.contextLeftPercentage}%`;
+    const contextUsed = `${contextInfo.percentage}%`;
+    const warningThreshold = config?.warningThreshold ?? 100;
+    const isWarning = contextInfo.percentage >= warningThreshold;
 
     const text = config?.showPercentageOnly
-      ? `${this.symbols.context_time} ${contextLeft}`
-      : `${this.symbols.context_time} ${contextInfo.inputTokens.toLocaleString()} (${contextLeft})`;
+      ? `${this.symbols.context_time} ${contextUsed}`
+      : `${this.symbols.context_time} ${contextInfo.inputTokens.toLocaleString()} (${contextUsed})`;
 
     return {
       text,
-      bgColor: colors.contextBg,
-      fgColor: colors.contextFg,
+      bgColor: isWarning ? colors.warningBg : colors.contextBg,
+      fgColor: isWarning ? colors.warningFg : colors.contextFg,
     };
   }
 
