@@ -15,10 +15,22 @@ export interface CacheEntry<T> {
   timestamp: number;
 }
 
+/**
+ * Config dir of the CURRENTLY running account (CLAUDE_CONFIG_DIR, else ~/.claude).
+ * Cache lives inside it so two accounts don't share one usage cache.
+ */
+function accountConfigDir(): string {
+  const env = process.env.CLAUDE_CONFIG_DIR;
+  if (env) {
+    const first = env.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return path.join(homedir(), ".claude");
+}
+
 export class CacheManager {
   private static readonly CACHE_DIR = path.join(
-    homedir(),
-    ".claude",
+    accountConfigDir(),
     "powerline"
   );
   private static readonly USAGE_CACHE_DIR = path.join(this.CACHE_DIR, "usage");

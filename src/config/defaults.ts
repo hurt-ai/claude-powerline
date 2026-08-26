@@ -53,6 +53,10 @@ export const DEFAULT_CONFIG: PowerlineConfig = {
       warningThreshold: 80,
       amount: 50,
     },
+    week: {
+      warningThreshold: 80,
+      amount: 200,
+    },
     block: {
       warningThreshold: 80,
       amount: 15,

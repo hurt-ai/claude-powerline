@@ -9,6 +9,8 @@ export {
 } from "./session";
 export { ContextProvider, ContextInfo } from "./context";
 export { MetricsProvider, MetricsInfo } from "./metrics";
+export { WeekProvider, WeekInfo } from "./week";
+export { RateLimitProvider, RateLimitInfo } from "./rate-limit";
 export {
   SegmentRenderer,
   PowerlineSymbols,
@@ -20,5 +22,7 @@ export {
   MetricsSegmentConfig,
   BlockSegmentConfig,
   TodaySegmentConfig,
+  WeekSegmentConfig,
+  RateLimitSegmentConfig,
   VersionSegmentConfig,
 } from "./renderer";

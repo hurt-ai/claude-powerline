@@ -29,6 +29,8 @@ export interface ColorTheme {
   session: SegmentColor;
   block: SegmentColor;
   today: SegmentColor;
+  week?: SegmentColor;
+  rateLimit?: SegmentColor;
   tmux: SegmentColor;
   context: SegmentColor;
   metrics: SegmentColor;
@@ -50,6 +52,10 @@ export interface PowerlineColors {
   blockFg: string;
   todayBg: string;
   todayFg: string;
+  weekBg?: string;
+  weekFg?: string;
+  rateLimitBg?: string;
+  rateLimitFg?: string;
   tmuxBg: string;
   tmuxFg: string;
   contextBg: string;

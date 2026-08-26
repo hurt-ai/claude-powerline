@@ -18,6 +18,10 @@ import {
   TmuxService,
   MetricsProvider,
   MetricsInfo,
+  WeekProvider,
+  WeekInfo,
+  RateLimitProvider,
+  RateLimitInfo,
   SegmentRenderer,
   PowerlineSymbols,
   AnySegmentConfig,
@@ -28,6 +32,8 @@ import {
   MetricsSegmentConfig,
   BlockSegmentConfig,
   TodaySegmentConfig,
+  WeekSegmentConfig,
+  RateLimitSegmentConfig,
   VersionSegmentConfig,
 } from "./segments";
 import { BlockProvider, BlockInfo } from "./segments/block";
@@ -47,6 +53,8 @@ export class PowerlineRenderer {
   private _usageProvider?: UsageProvider;
   private _blockProvider?: BlockProvider;
   private _todayProvider?: TodayProvider;
+  private _weekProvider?: WeekProvider;
+  private _rateLimitProvider?: RateLimitProvider;
   private _contextProvider?: ContextProvider;
   private _gitService?: GitService;
   private _tmuxService?: TmuxService;
@@ -76,6 +84,20 @@ export class PowerlineRenderer {
       this._todayProvider = new TodayProvider();
     }
     return this._todayProvider;
+  }
+
+  private get weekProvider(): WeekProvider {
+    if (!this._weekProvider) {
+      this._weekProvider = new WeekProvider();
+    }
+    return this._weekProvider;
+  }
+
+  private get rateLimitProvider(): RateLimitProvider {
+    if (!this._rateLimitProvider) {
+      this._rateLimitProvider = new RateLimitProvider();
+    }
+    return this._rateLimitProvider;
   }
 
   private get contextProvider(): ContextProvider {
@@ -132,10 +154,19 @@ export class PowerlineRenderer {
       ? await this.todayProvider.getTodayInfo()
       : null;
 
+    const weekInfo = this.needsSegmentInfo("week")
+      ? await this.weekProvider.getWeekInfo()
+      : null;
+
+    const rateLimitInfo = this.needsSegmentInfo("rateLimit")
+      ? await this.rateLimitProvider.getRateLimitInfo()
+      : null;
+
     const contextInfo = this.needsSegmentInfo("context")
       ? await this.contextProvider.calculateContextTokens(
           hookData.transcript_path,
-          hookData.model?.id
+          hookData.model?.id,
+          hookData.context_window
         )
       : null;
 
@@ -149,6 +180,8 @@ export class PowerlineRenderer {
         usageInfo,
         blockInfo,
         todayInfo,
+        weekInfo,
+        rateLimitInfo,
         contextInfo,
         metricsInfo
       );
@@ -162,6 +195,8 @@ export class PowerlineRenderer {
           usageInfo,
           blockInfo,
           todayInfo,
+          weekInfo,
+          rateLimitInfo,
           contextInfo,
           metricsInfo
         )
@@ -176,6 +211,8 @@ export class PowerlineRenderer {
     usageInfo: UsageInfo | null,
     blockInfo: BlockInfo | null,
     todayInfo: TodayInfo | null,
+    weekInfo: WeekInfo | null,
+    rateLimitInfo: RateLimitInfo | null,
     contextInfo: ContextInfo | null,
     metricsInfo: MetricsInfo | null
   ): Promise<string> {
@@ -200,6 +237,8 @@ export class PowerlineRenderer {
           usageInfo,
           blockInfo,
           todayInfo,
+          weekInfo,
+          rateLimitInfo,
           contextInfo,
           metricsInfo,
           colors,
@@ -300,6 +339,8 @@ export class PowerlineRenderer {
     usageInfo: UsageInfo | null,
     blockInfo: BlockInfo | null,
     todayInfo: TodayInfo | null,
+    weekInfo: WeekInfo | null,
+    rateLimitInfo: RateLimitInfo | null,
     contextInfo: ContextInfo | null,
     metricsInfo: MetricsInfo | null
   ): Promise<string> {
@@ -332,6 +373,8 @@ export class PowerlineRenderer {
         usageInfo,
         blockInfo,
         todayInfo,
+        weekInfo,
+        rateLimitInfo,
         contextInfo,
         metricsInfo,
         colors,
@@ -342,7 +385,7 @@ export class PowerlineRenderer {
         if (isCapsuleStyle && !isFirst) {
           line += " ";
         }
-        
+
         line += this.formatSegment(
           segmentData.bgColor,
           segmentData.fgColor,
@@ -362,6 +405,8 @@ export class PowerlineRenderer {
     usageInfo: UsageInfo | null,
     blockInfo: BlockInfo | null,
     todayInfo: TodayInfo | null,
+    weekInfo: WeekInfo | null,
+    rateLimitInfo: RateLimitInfo | null,
     contextInfo: ContextInfo | null,
     metricsInfo: MetricsInfo | null,
     colors: PowerlineColors,
@@ -428,6 +473,22 @@ export class PowerlineRenderer {
       return this.renderTodaySegment(
         segment.config as TodaySegmentConfig,
         todayInfo,
+        colors
+      );
+    }
+
+    if (segment.type === "week") {
+      return this.renderWeekSegment(
+        segment.config as WeekSegmentConfig,
+        weekInfo,
+        colors
+      );
+    }
+
+    if (segment.type === "rateLimit") {
+      return this.renderRateLimitSegment(
+        segment.config as RateLimitSegmentConfig,
+        rateLimitInfo,
         colors
       );
     }
@@ -528,6 +589,34 @@ export class PowerlineRenderer {
     return this.segmentRenderer.renderToday(todayInfo, colors, todayType);
   }
 
+  private renderWeekSegment(
+    config: WeekSegmentConfig,
+    weekInfo: WeekInfo | null,
+    colors: PowerlineColors
+  ) {
+    if (!weekInfo) return null;
+    const weekType = config?.type || "cost";
+    return this.segmentRenderer.renderWeek(weekInfo, colors, weekType);
+  }
+
+  private renderRateLimitSegment(
+    config: RateLimitSegmentConfig,
+    rateLimitInfo: RateLimitInfo | null,
+    colors: PowerlineColors
+  ) {
+    if (!rateLimitInfo) return null;
+    const segments = this.segmentRenderer.renderRateLimit(rateLimitInfo, colors, config);
+    // Return first segment for now (5h), could be enhanced to return combined
+    if (segments.length === 0) return null;
+    // Combine segments into single text
+    const combinedText = segments.map(s => s.text).join(" ");
+    return {
+      text: combinedText,
+      bgColor: segments[0].bgColor,
+      fgColor: segments[0].fgColor,
+    };
+  }
+
   private renderVersionSegment(
     config: VersionSegmentConfig,
     hookData: ClaudeHookData,
@@ -562,6 +651,9 @@ export class PowerlineRenderer {
       session_cost: symbolSet.session_cost,
       block_cost: symbolSet.block_cost,
       today_cost: symbolSet.today_cost,
+      week_cost: symbolSet.week_cost,
+      rate_limit_5h: symbolSet.rate_limit_5h,
+      rate_limit_7d: symbolSet.rate_limit_7d,
       context_time: symbolSet.context_time,
       metrics_response: symbolSet.metrics_response,
       metrics_last_response: symbolSet.metrics_last_response,
@@ -632,6 +724,8 @@ export class PowerlineRenderer {
     const session = getSegmentColors("session");
     const block = getSegmentColors("block");
     const today = getSegmentColors("today");
+    const week = colorTheme.week ? getSegmentColors("week") : today;
+    const rateLimit = colorTheme.rateLimit ? getSegmentColors("rateLimit") : model;
     const tmux = getSegmentColors("tmux");
     const context = getSegmentColors("context");
     const metrics = getSegmentColors("metrics");
@@ -673,6 +767,10 @@ export class PowerlineRenderer {
       blockFg: block.fg,
       todayBg: today.bg,
       todayFg: today.fg,
+      weekBg: week.bg,
+      weekFg: week.fg,
+      rateLimitBg: rateLimit.bg,
+      rateLimitFg: rateLimit.fg,
       tmuxBg: tmux.bg,
       tmuxFg: tmux.fg,
       contextBg: context.bg,
@@ -703,6 +801,10 @@ export class PowerlineRenderer {
         return colors.blockBg;
       case "today":
         return colors.todayBg;
+      case "week":
+        return colors.weekBg || colors.todayBg;
+      case "rateLimit":
+        return colors.rateLimitBg || colors.modelBg;
       case "tmux":
         return colors.tmuxBg;
       case "context":

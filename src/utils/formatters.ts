@@ -62,3 +62,26 @@ export function formatDuration(seconds: number): string {
     return `${(seconds / 86400).toFixed(1)}d`;
   }
 }
+
+export function formatTimeUntil(isoDate: string | null): string | null {
+  if (!isoDate) return null;
+
+  try {
+    const target = new Date(isoDate);
+    const now = new Date();
+    const diffMs = target.getTime() - now.getTime();
+
+    if (diffMs <= 0) return null;
+
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+
+    if (hours > 0) {
+      return `${hours}h${minutes > 0 ? minutes + "m" : ""}`;
+    }
+    return `${minutes}m`;
+  } catch {
+    return null;
+  }
+}

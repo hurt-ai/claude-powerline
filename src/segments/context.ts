@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { debug } from "../utils/logger";
-import { parseJsonlFile, type ParsedEntry } from "../utils/claude";
+import { parseJsonlFile, type ParsedEntry, type ClaudeHookData } from "../utils/claude";
 import type { PowerlineConfig } from "../config/loader";
 
 export interface ContextInfo {
@@ -51,10 +51,59 @@ export class ContextProvider {
     return "default";
   }
 
+  private buildContextInfo(
+    contextLength: number,
+    contextLimit: number
+  ): ContextInfo {
+    // Don't cap at 100% - allow showing overflow
+    const percentage = Math.max(0, Math.round((contextLength / contextLimit) * 100));
+    const usablePercentage = percentage;
+    const contextLeftPercentage = Math.max(0, 100 - usablePercentage);
+
+    return {
+      inputTokens: contextLength,
+      percentage,
+      usablePercentage,
+      contextLeftPercentage,
+      maxTokens: contextLimit,
+      usableTokens: contextLimit,
+    };
+  }
+
   async calculateContextTokens(
     transcriptPath: string,
-    modelId?: string
+    modelId?: string,
+    contextWindow?: ClaudeHookData["context_window"]
   ): Promise<ContextInfo | null> {
+    // Use new API fields if available (Claude Code v2.1.6+)
+    if (
+      contextWindow &&
+      typeof contextWindow.used_percentage === "number" &&
+      contextWindow.context_window_size
+    ) {
+      const percentage = Math.floor(contextWindow.used_percentage);
+      const contextLimit = contextWindow.context_window_size;
+      const inputTokens = Math.round(
+        (contextLimit * contextWindow.used_percentage) / 100
+      );
+      const remainingPercentage =
+        contextWindow.remaining_percentage ?? 100 - percentage;
+
+      debug(
+        `Using API percentages: ${percentage}% used, ${remainingPercentage}% remaining`
+      );
+
+      return {
+        inputTokens,
+        percentage,
+        usablePercentage: percentage,
+        contextLeftPercentage: Math.max(0, remainingPercentage),
+        maxTokens: contextLimit,
+        usableTokens: contextLimit,
+      };
+    }
+
+    // Fallback: Read from transcript (original approach)
     try {
       debug(`Calculating context tokens from transcript: ${transcriptPath}`);
 
@@ -105,27 +154,7 @@ export class ContextProvider {
           `Most recent main chain context: ${contextLength} tokens (limit: ${contextLimit})`
         );
 
-        const percentage = Math.min(
-          100,
-          Math.max(0, Math.round((contextLength / contextLimit) * 100))
-        );
-
-        const usableLimit = contextLimit;
-        const usablePercentage = Math.min(
-          100,
-          Math.max(0, Math.round((contextLength / usableLimit) * 100))
-        );
-
-        const contextLeftPercentage = Math.max(0, 100 - usablePercentage);
-
-        return {
-          inputTokens: contextLength,
-          percentage,
-          usablePercentage,
-          contextLeftPercentage,
-          maxTokens: contextLimit,
-          usableTokens: usableLimit,
-        };
+        return this.buildContextInfo(contextLength, contextLimit);
       }
 
       debug("No main chain entries with usage data found");

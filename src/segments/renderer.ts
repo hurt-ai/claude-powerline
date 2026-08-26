@@ -3,6 +3,21 @@ import type { ClaudeHookData } from "../utils/claude";
 import type { PowerlineColors } from "../themes";
 import type { PowerlineConfig } from "../config/loader";
 import type { BlockInfo } from "./block";
+import { homedir } from "node:os";
+
+/**
+ * Which Claude account this statusline runs under, by CLAUDE_CONFIG_DIR.
+ * ~/.claude (or unset) -> "1" (default/work); ~/.claude-second -> "2" (personal).
+ * Other custom config dir -> "?".
+ */
+function accountLabel(): string {
+  const env = process.env.CLAUDE_CONFIG_DIR;
+  const home = homedir();
+  const dir = env ? (env.split(",")[0]?.trim() || "") : "";
+  if (dir === "" || dir === path.join(home, ".claude")) return "1";
+  if (dir === path.join(home, ".claude-second")) return "2";
+  return "?";
+}
 
 export interface SegmentConfig {
   enabled: boolean;
@@ -55,6 +70,17 @@ export interface TodaySegmentConfig extends SegmentConfig {
   type: "cost" | "tokens" | "both" | "breakdown";
 }
 
+export interface WeekSegmentConfig extends SegmentConfig {
+  type: "cost" | "tokens" | "both" | "breakdown";
+}
+
+export interface RateLimitSegmentConfig extends SegmentConfig {
+  show5h?: boolean;
+  show7d?: boolean;
+  show7dSonnet?: boolean;
+  showTimeRemaining?: boolean;
+}
+
 export interface VersionSegmentConfig extends SegmentConfig {}
 
 export type AnySegmentConfig =
@@ -67,6 +93,8 @@ export type AnySegmentConfig =
   | MetricsSegmentConfig
   | BlockSegmentConfig
   | TodaySegmentConfig
+  | WeekSegmentConfig
+  | RateLimitSegmentConfig
   | VersionSegmentConfig;
 
 import {
@@ -75,6 +103,7 @@ import {
   formatTokenBreakdown,
   formatTimeSince,
   formatDuration,
+  formatTimeUntil,
 } from "../utils/formatters";
 import { getBudgetStatus } from "../utils/budget";
 import type {
@@ -85,6 +114,8 @@ import type {
   MetricsInfo,
 } from ".";
 import type { TodayInfo } from "./today";
+import type { WeekInfo } from "./week";
+import type { RateLimitInfo } from "./rate-limit";
 
 export interface PowerlineSymbols {
   right: string;
@@ -105,6 +136,7 @@ export interface PowerlineSymbols {
   session_cost: string;
   block_cost: string;
   today_cost: string;
+  week_cost: string;
   context_time: string;
   metrics_response: string;
   metrics_last_response: string;
@@ -114,6 +146,8 @@ export interface PowerlineSymbols {
   metrics_lines_removed: string;
   metrics_burn: string;
   version: string;
+  rate_limit_5h: string;
+  rate_limit_7d: string;
 }
 
 export interface SegmentData {
@@ -266,7 +300,7 @@ export class SegmentRenderer {
     const modelName = hookData.model?.display_name || "Claude";
 
     return {
-      text: `${this.symbols.model} ${modelName}`,
+      text: `${accountLabel()} ${this.symbols.model} ${modelName}`,
       bgColor: colors.modelBg,
       fgColor: colors.modelFg,
     };
@@ -600,6 +634,70 @@ export class SegmentRenderer {
       bgColor: colors.todayBg,
       fgColor: colors.todayFg,
     };
+  }
+
+  renderWeek(
+    weekInfo: WeekInfo,
+    colors: PowerlineColors,
+    type = "cost"
+  ): SegmentData {
+    const weekBudget = this.config.budget?.week;
+    const text = `${this.symbols.week_cost} ${this.formatUsageWithBudget(
+      weekInfo.cost,
+      weekInfo.tokens,
+      weekInfo.tokenBreakdown,
+      type,
+      weekBudget?.amount,
+      weekBudget?.warningThreshold,
+      weekBudget?.type
+    )}`;
+
+    return {
+      text,
+      bgColor: colors.weekBg || colors.todayBg,
+      fgColor: colors.weekFg || colors.todayFg,
+    };
+  }
+
+  renderRateLimit(
+    rateLimitInfo: RateLimitInfo,
+    colors: PowerlineColors,
+    config?: RateLimitSegmentConfig
+  ): SegmentData[] {
+    const segments: SegmentData[] = [];
+    const show5h = config?.show5h !== false;
+    const show7d = config?.show7d !== false;
+    const showTime = config?.showTimeRemaining !== false;
+
+    // 5h session limit
+    if (show5h && rateLimitInfo.session !== null) {
+      const pct = Math.round(rateLimitInfo.session);
+      const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.sessionResetsAt) : null;
+      const text = timeLeft
+        ? `${this.symbols.rate_limit_5h} ${pct}% (${timeLeft})`
+        : `${this.symbols.rate_limit_5h} ${pct}%`;
+      segments.push({
+        text,
+        bgColor: colors.rateLimitBg || colors.modelBg,
+        fgColor: colors.rateLimitFg || colors.modelFg,
+      });
+    }
+
+    // 7d week limit
+    if (show7d && rateLimitInfo.week !== null) {
+      const pct = Math.round(rateLimitInfo.week);
+      const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.weekResetsAt) : null;
+      const text = timeLeft
+        ? `${this.symbols.rate_limit_7d} ${pct}% (${timeLeft})`
+        : `${this.symbols.rate_limit_7d} ${pct}%`;
+      segments.push({
+        text,
+        bgColor: colors.rateLimitBg || colors.modelBg,
+        fgColor: colors.rateLimitFg || colors.modelFg,
+      });
+    }
+
+    return segments;
   }
 
   private getDisplayDirectoryName(

@@ -20,6 +20,7 @@ export const SYMBOLS = {
   session_cost: "§",
   block_cost: "◱",
   today_cost: "☉",
+  week_cost: "☰",
   context_time: "◔",
   metrics_response: "⧖",
   metrics_last_response: "Δ",
@@ -29,6 +30,8 @@ export const SYMBOLS = {
   metrics_lines_removed: "-",
   metrics_burn: "⟢",
   version: "◈",
+  rate_limit_5h: "⏱",
+  rate_limit_7d: "⏳",
 } as const;
 
 export const TEXT_SYMBOLS = {
@@ -51,6 +54,7 @@ export const TEXT_SYMBOLS = {
   session_cost: "S",
   block_cost: "B",
   today_cost: "D",
+  week_cost: "W",
   context_time: "C",
   metrics_response: "R",
   metrics_last_response: "L",
@@ -60,5 +64,7 @@ export const TEXT_SYMBOLS = {
   metrics_lines_removed: "-",
   metrics_burn: "~/h",
   version: "V",
+  rate_limit_5h: "5h",
+  rate_limit_7d: "7d",
 } as const;
 

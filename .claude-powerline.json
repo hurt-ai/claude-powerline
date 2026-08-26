@@ -130,6 +130,8 @@
     }
   },
   "modelContextLimits": {
-    "sonnet": 200000
+    "sonnet": 200000,
+    "opus": 200000,
+    "default": 200000
   }
 }
