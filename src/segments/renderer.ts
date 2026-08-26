@@ -104,6 +104,7 @@ import {
   formatTimeSince,
   formatDuration,
   formatTimeUntil,
+  formatWeekPace,
 } from "../utils/formatters";
 import { getBudgetStatus } from "../utils/budget";
 import type {
@@ -687,9 +688,11 @@ export class SegmentRenderer {
     if (show7d && rateLimitInfo.week !== null) {
       const pct = Math.round(rateLimitInfo.week);
       const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.weekResetsAt) : null;
-      const text = timeLeft
-        ? `${this.symbols.rate_limit_7d} ${pct}% (${timeLeft})`
+      const pace = formatWeekPace(rateLimitInfo.week, rateLimitInfo.weekResetsAt);
+      const head = pace
+        ? `${this.symbols.rate_limit_7d} ${pct}% ${pace}`
         : `${this.symbols.rate_limit_7d} ${pct}%`;
+      const text = timeLeft ? `${head} (${timeLeft})` : head;
       segments.push({
         text,
         bgColor: colors.rateLimitBg || colors.modelBg,

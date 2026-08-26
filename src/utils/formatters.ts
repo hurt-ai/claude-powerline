@@ -85,3 +85,42 @@ export function formatTimeUntil(isoDate: string | null): string | null {
     return null;
   }
 }
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** Below this much of the window elapsed, the pace figure is noise: an hour of heavy work early
+ * on projects to several hundred per cent and means nothing by evening. */
+const PACE_MIN_ELAPSED = 0.15;
+
+/**
+ * How the week is going, not just how much of it is gone.
+ *
+ * `delta` is the gap between the even burn line (the integral of the allowed constant rate) and
+ * what was actually spent, in percentage points: positive means a reserve was built up, negative
+ * means the week is being overspent. It is the number the night budget is drawn from, so it
+ * belongs on screen next to the raw percentage rather than only inside the gate.
+ *
+ * Needs no stored history: both terms come from the same API answer and describe the same window.
+ */
+export function formatWeekPace(
+  utilization: number | null,
+  resetsAt: string | null
+): string | null {
+  if (utilization === null || !resetsAt) return null;
+
+  try {
+    const end = new Date(resetsAt).getTime();
+    if (Number.isNaN(end)) return null;
+    const start = end - WEEK_MS;
+    const elapsed = (Date.now() - start) / WEEK_MS;
+    if (elapsed <= 0 || elapsed > 1) return null;
+
+    const delta = 100 * elapsed - utilization;
+    const rounded = Math.round(delta);
+    const sign = rounded > 0 ? "+" : "";
+    // Early in the window the arrow would be pure noise, so only the gap is shown.
+    if (elapsed < PACE_MIN_ELAPSED) return `${sign}${rounded}`;
+    return `${sign}${rounded}${delta < 0 ? "↑" : "↓"}`;
+  } catch {
+    return null;
+  }
+}
