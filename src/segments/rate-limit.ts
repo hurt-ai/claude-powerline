@@ -1,5 +1,6 @@
 import { getCredentials } from "../utils/credentials";
 import { debug } from "../utils/logger";
+import { CacheManager } from "../utils/cache";
 
 const API_TIMEOUT_MS = 5000;
 
@@ -27,7 +28,24 @@ export interface RateLimitInfo {
   weekSonnetResetsAt: string | null;
 }
 
-// In-memory cache
+/**
+ * Two-level cache, and the disk level is the one that matters.
+ *
+ * The status line is a NEW PROCESS on every repaint, so an in-memory cache is empty on every
+ * repaint too: it never survives to be hit. That made a live HTTP call mandatory per repaint, and
+ * any failed call rendered BOTH windows as null — so the whole segment vanished from the line
+ * instead of showing a slightly older number. That is the disappearing rate limit.
+ *
+ * On disk the entry survives across processes and across accounts' own config dirs, so a repaint
+ * inside the TTL costs no network at all, and a failed fetch falls back to the last known value.
+ */
+const CACHE_TYPE = "rate-limit" as const;
+
+interface CachedRateLimits {
+  limits: UsageLimits;
+  fetchedAt: number;
+}
+
 let cachedLimits: UsageLimits | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 60000; // 60 seconds
@@ -69,18 +87,41 @@ export class RateLimitProvider {
     }
   }
 
+  private async readDiskCache(): Promise<CachedRateLimits | null> {
+    try {
+      const entry = await CacheManager.getUsageCache(CACHE_TYPE);
+      if (entry && entry.limits && typeof entry.fetchedAt === "number") {
+        return entry as CachedRateLimits;
+      }
+      return null;
+    } catch (error) {
+      debug("Failed to read rate limit disk cache:", error);
+      return null;
+    }
+  }
+
   private async fetchUsageLimits(): Promise<UsageLimits | null> {
-    // Check cache first
     const now = Date.now();
     if (cachedLimits && now - cacheTimestamp < CACHE_TTL_MS) {
-      debug("Using cached rate limits");
+      debug("Using in-memory rate limits");
       return cachedLimits;
     }
+
+    // The disk entry is what actually survives between repaints. Kept even when stale: it is the
+    // fallback every failure path below returns instead of null.
+    const onDisk = await this.readDiskCache();
+    if (onDisk && now - onDisk.fetchedAt < CACHE_TTL_MS) {
+      cachedLimits = onDisk.limits;
+      cacheTimestamp = onDisk.fetchedAt;
+      debug("Using disk-cached rate limits");
+      return onDisk.limits;
+    }
+    const stale = onDisk?.limits ?? cachedLimits;
 
     const token = getCredentials();
     if (!token) {
       debug("No OAuth token available");
-      return cachedLimits; // Return stale cache if available
+      return stale;
     }
 
     try {
@@ -103,7 +144,7 @@ export class RateLimitProvider {
 
       if (!response.ok) {
         debug(`API response not ok: ${response.status}`);
-        return cachedLimits;
+        return stale;
       }
 
       const data = await response.json();
@@ -114,9 +155,10 @@ export class RateLimitProvider {
         seven_day_sonnet: data.seven_day_sonnet ?? null,
       };
 
-      // Update cache
       cachedLimits = limits;
       cacheTimestamp = now;
+      const entry: CachedRateLimits = { limits, fetchedAt: now };
+      await CacheManager.setUsageCache(CACHE_TYPE, entry, now);
 
       debug(
         `Rate limits fetched: 5h=${limits.five_hour?.utilization}%, 7d=${limits.seven_day?.utilization}%`
@@ -125,7 +167,7 @@ export class RateLimitProvider {
       return limits;
     } catch (error) {
       debug("Failed to fetch usage limits:", error);
-      return cachedLimits;
+      return stale;
     }
   }
 }
