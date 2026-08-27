@@ -1,3 +1,51 @@
+> ## About this fork
+>
+> This is a fork of [owloops/claude-powerline](https://github.com/owloops/claude-powerline),
+> maintained by [hurt-ai](https://github.com/hurt-ai) for a farm of Claude Code agents running
+> side by side. It adds one thing upstream does not have: **plan rate limits on the statusline**,
+> read per account, with a pace figure that says whether you are ahead of or behind an even burn.
+>
+> ### What is added
+>
+> - **`rateLimit` segment** — the 5-hour window and the 7-day window with time to reset:
+>   `⏱ 16% (3h39m) ⏳ 11% +15↓ (125h9m)`.
+> - **Pace figure** — `+15↓` is the gap in percentage points between the even burn line and what
+>   was actually spent. `↓` means a reserve was built up, `↑` means the week is being overspent.
+>   Below 15% of the window elapsed the arrow is omitted: early on the figure is noise.
+> - **Colour on the pace digit only** — green for `↓`, red for `↑`. Percentages and the time tail
+>   keep the segment colour. The colour goes through the same colorSupport fork as the rest of the
+>   line, so a terminal without truecolor gets the palette it can read, and a terminal without
+>   colour gets a plain digit.
+> - **Multi-account support** — limits are read for the account the statusline runs under, honouring
+>   `CLAUDE_CONFIG_DIR`. Credentials come from the macOS keychain, falling back to
+>   `<config dir>/.credentials.json`.
+> - **Disk-backed limit cache** — the segment no longer disappears between calls when the API is
+>   slow to answer.
+>
+> ### Configuring it
+>
+> In your `claude-powerline.json`, inside a line's `segments`:
+>
+> ```json
+> {
+>   "rateLimit": {
+>     "enabled": true,
+>     "show5h": true,
+>     "show7d": true,
+>     "show7dSonnet": false,
+>     "showTimeRemaining": true
+>   }
+> }
+> ```
+>
+> Colours for the segment are set like any other, under `colors.custom.rateLimit`. The pace digit
+> ignores those and uses its own green/red, since its whole job is to differ from its surroundings.
+>
+> ### Fork status
+>
+> Branched from upstream in December 2025 and deliberately not tracking it since: what we need is
+> here, and upstream has none of it. Everything below this block is the original README.
+
 <div align="center">
 
 # Claude Powerline
