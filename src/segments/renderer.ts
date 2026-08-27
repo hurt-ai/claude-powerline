@@ -4,6 +4,17 @@ import type { PowerlineColors } from "../themes";
 import type { PowerlineConfig } from "../config/loader";
 import type { BlockInfo } from "./block";
 import { homedir } from "node:os";
+import {
+  getColorSupport,
+  hexToAnsi,
+  hexTo256Ansi,
+  hexToBasicAnsi,
+} from "../utils/colors";
+
+/** Behind the even burn line — a reserve was built up. */
+const PACE_UNDER_HEX = "#a6e3a1";
+/** Ahead of it — the week is being overspent. */
+const PACE_OVER_HEX = "#f38ba8";
 
 /**
  * Which Claude account this statusline runs under, by CLAUDE_CONFIG_DIR.
@@ -689,8 +700,9 @@ export class SegmentRenderer {
       const pct = Math.round(rateLimitInfo.week);
       const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.weekResetsAt) : null;
       const pace = formatWeekPace(rateLimitInfo.week, rateLimitInfo.weekResetsAt);
+      const segFg = colors.rateLimitFg || colors.modelFg;
       const head = pace
-        ? `${this.symbols.rate_limit_7d} ${pct}% ${pace}`
+        ? `${this.symbols.rate_limit_7d} ${pct}% ${this.colorizePace(pace, segFg)}`
         : `${this.symbols.rate_limit_7d} ${pct}%`;
       const text = timeLeft ? `${head} (${timeLeft})` : head;
       segments.push({
@@ -701,6 +713,48 @@ export class SegmentRenderer {
     }
 
     return segments;
+  }
+
+  /**
+   * The pace digit is the only part of a segment that carries a colour of its own.
+   *
+   * The value it returns to is `segFg` VERBATIM, never a re-conversion of it. Fields of
+   * PowerlineColors are ALREADY ANSI strings — powerline.ts builds them through hexToAnsi
+   * before the renderer ever sees them. Feeding one back in parses "\x1b[38;2;125;78;0m" as a
+   * hex triple: `parseInt("[3", 16)` is NaN, and out comes `\x1b[38;2;NaN;8;2m`, which the
+   * terminal cannot read and prints as text. That also widened the line, because stripAnsi
+   * only removes `ESC[<digits and ;>m` and a sequence with letters in it counts as visible
+   * characters. Caught on screen 2026-08-26, across all three accounts at once.
+   *
+   * The colour comes through the same colorSupport fork as the rest of the line (the idiom is
+   * powerline.ts:formatSegment): a truecolor escape on a terminal that cannot read one is the
+   * same garbage by another route. Where there is no colour at all the digit stays plain — a
+   * single escape in an otherwise escape-free line is worse than no colour.
+   *
+   * The ARROW decides, not the sign. Below PACE_MIN_ELAPSED formatWeekPace returns the gap
+   * without an arrow, and exactly on the line `delta = 0` renders as `↓`. Reading the sign
+   * would colour the first case and mis-colour the second.
+   */
+  private colorizePace(pace: string, segFg: string): string {
+    const hex = pace.includes("↑")
+      ? PACE_OVER_HEX
+      : pace.includes("↓")
+        ? PACE_UNDER_HEX
+        : null;
+    if (!hex) return pace;
+
+    const colorMode = this.config.display.colorCompatibility || "auto";
+    const colorSupport = colorMode === "auto" ? getColorSupport() : colorMode;
+    if (colorSupport === "none") return pace;
+
+    const toAnsi =
+      colorSupport === "ansi"
+        ? hexToBasicAnsi
+        : colorSupport === "ansi256"
+          ? hexTo256Ansi
+          : hexToAnsi;
+
+    return `${toAnsi(hex, false)}${pace}${segFg}`;
   }
 
   private getDisplayDirectoryName(
