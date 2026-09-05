@@ -771,6 +771,11 @@ export class PowerlineRenderer {
       weekFg: week.fg,
       rateLimitBg: rateLimit.bg,
       rateLimitFg: rateLimit.fg,
+      // Themes that do not colour the segment let it wear the model's colours, so that is
+      // the background the pace digit actually sits on.
+      rateLimitBgHex: colorTheme.rateLimit?.bg ?? colorTheme.model.bg,
+      ratePaceUnderHex: colorTheme.rateLimit?.paceUnder,
+      ratePaceOverHex: colorTheme.rateLimit?.paceOver,
       tmuxBg: tmux.bg,
       tmuxFg: tmux.fg,
       contextBg: context.bg,

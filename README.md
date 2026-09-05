@@ -29,9 +29,12 @@
 >   the API hands out an accumulated percentage and nothing else; read it as "if it goes on as it
 >   has gone". `showTimeRemaining: false` turns the figure off entirely.
 > - **Colour on the pace digit only** — green for `↓`, red for `↑`. Percentages and the time figure
->   keep the segment colour. The colour goes through the same colorSupport fork as the rest of the
->   line, so a terminal without truecolor gets the palette it can read, and a terminal without
->   colour gets a plain digit.
+>   keep the segment colour. The pair follows the bar the digit sits on: a pastel green reads on a
+>   dark segment and measures about 1.4:1 on the cream a light theme puts there, so a light
+>   background gets the dark pair instead. Name `paceUnder` / `paceOver` under
+>   `colors.custom.rateLimit` to override either. The colour goes through the same colorSupport
+>   fork as the rest of the line, so a terminal without truecolor gets the palette it can read,
+>   and a terminal without colour gets a plain digit.
 > - **Multi-account support** — limits are read for the account the statusline runs under, honouring
 >   `CLAUDE_CONFIG_DIR`. Credentials come from the macOS keychain, falling back to
 >   `<config dir>/.credentials.json`.
@@ -54,8 +57,22 @@
 > }
 > ```
 >
-> Colours for the segment are set like any other, under `colors.custom.rateLimit`. The pace digit
-> ignores those and uses its own green/red, since its whole job is to differ from its surroundings.
+> Colours for the segment are set like any other, under `colors.custom.rateLimit`, which also takes
+> the two optional pace colours:
+>
+> ```json
+> {
+>   "rateLimit": {
+>     "bg": "#fff1c2",
+>     "fg": "#7d4e00",
+>     "paceUnder": "#1a7f37",
+>     "paceOver": "#cf222e"
+>   }
+> }
+> ```
+>
+> Left out, they are chosen from the background's brightness — the digit's whole job is to differ
+> from its surroundings, and that only works if it is readable against them.
 >
 > ### Fork status
 >

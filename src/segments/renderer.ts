@@ -6,15 +6,18 @@ import type { BlockInfo } from "./block";
 import { homedir } from "node:os";
 import {
   getColorSupport,
+  isLightBackground,
   hexToAnsi,
   hexTo256Ansi,
   hexToBasicAnsi,
 } from "../utils/colors";
 
-/** Behind the even burn line — a reserve was built up. */
-const PACE_UNDER_HEX = "#a6e3a1";
-/** Ahead of it — the week is being overspent. */
-const PACE_OVER_HEX = "#f38ba8";
+/** The pace digit's two palettes. Which one is used follows the segment's background, because a
+ * pastel green that reads on a dark bar is invisible on a light one — measured at ~1.4:1 against
+ * the cream #fff1c2 that a light theme puts under this segment. Either colour can be overridden
+ * per theme through colors.custom.rateLimit.paceUnder / .paceOver. */
+const PACE_ON_DARK = { under: "#a6e3a1", over: "#f38ba8" };
+const PACE_ON_LIGHT = { under: "#1a7f37", over: "#cf222e" };
 
 /** The two rate-limit windows the API reports on. Their length is the only thing that separates
  * them, so both go through the same rendering. */
@@ -721,7 +724,7 @@ export class SegmentRenderer {
         : null;
 
       const parts = [`${w.symbol} ${pct}%`];
-      if (pace) parts.push(this.colorizePace(pace, segFg));
+      if (pace) parts.push(this.colorizePace(pace, segFg, colors));
       if (time) parts.push(time);
 
       segments.push({
@@ -754,12 +757,18 @@ export class SegmentRenderer {
    * without an arrow, and exactly on the line `delta = 0` renders as `↓`. Reading the sign
    * would colour the first case and mis-colour the second.
    */
-  private colorizePace(pace: string, segFg: string): string {
-    const hex = pace.includes("↑")
-      ? PACE_OVER_HEX
-      : pace.includes("↓")
-        ? PACE_UNDER_HEX
-        : null;
+  private colorizePace(
+    pace: string,
+    segFg: string,
+    colors: PowerlineColors
+  ): string {
+    const base = isLightBackground(colors.rateLimitBgHex)
+      ? PACE_ON_LIGHT
+      : PACE_ON_DARK;
+    const over = colors.ratePaceOverHex || base.over;
+    const under = colors.ratePaceUnderHex || base.under;
+
+    const hex = pace.includes("↑") ? over : pace.includes("↓") ? under : null;
     if (!hex) return pace;
 
     const colorMode = this.config.display.colorCompatibility || "auto";

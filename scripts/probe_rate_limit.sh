@@ -39,10 +39,10 @@ has() {     # has <string> <ERE> -> yes|no
   echo "  FAIL build failed — THE PROBE DID NOT RUN, and says nothing about coverage"; exit 2; }
 
 # --- one rendering of the line ----------------------------------------------------------------
-# render <window 5h|7d> <elapsed fraction> <utilization|null> <resets iso|none> [FORCE_COLOR]
+# render <window 5h|7d> <elapsed fraction> <utilization|null> <resets iso|none> [FORCE_COLOR] [config]
 # Returns the program's output as it is, byte for byte.
 render() {
-  local win="$1" elapsed="$2" util="$3" resets="$4" fc="${5:-3}"
+  local win="$1" elapsed="$2" util="$3" resets="$4" fc="${5:-3}" cfgfile="${6:-probe_rate_limit.config.json}"
   local cfg; cfg="$(mktemp -d)"
   mkdir -p "$cfg/powerline/usage"
 
@@ -65,7 +65,7 @@ PY
 
   printf '%s' '{"session_id":"probe","transcript_path":"/dev/null","cwd":"'"$REPO"'","workspace":{"current_dir":"'"$REPO"'","project_dir":"'"$REPO"'"},"model":{"id":"claude-opus-4-1","display_name":"Opus"},"version":"1.0.0"}' \
     | CLAUDE_CONFIG_DIR="$cfg" FORCE_COLOR="$fc" \
-      bun "$OUT/index.js" --config="$REPO/scripts/probe_rate_limit.config.json" 2>/dev/null
+      bun "$OUT/index.js" --config="$REPO/scripts/$cfgfile" 2>/dev/null
 }
 
 # Visible text: stripped by the SAME expression that measures width (terminal.ts:4) — only
@@ -112,36 +112,53 @@ check 'no reset instant: percentage survives, pace does not' yes \
   "$(has "$(visible "$O")" '⏳ 42%')"
 check 'no reset instant: no time figure' no "$(has "$(visible "$O")" '(\(|!)[0-9]')"
 
-echo "== the pace digit carries its own colour =="
+echo "== the pace digit's palette follows the bar it sits on =="
 
-# Overspending: red digit, closed by a VALID escape.
+# The probe's own config puts the segment on cream #fff1c2, the light-theme background. A pastel
+# green there measures ~1.4:1 and is not readable, so the dark pair is the one that must appear.
 O=$(render 7d 0.50 97 iso)
-check 'overspending: digit and arrow wrapped in red, closed properly' yes \
-  "$(has "$O" "${ESC}\[38;2;243;139;168m-47↑${ESC}\[[0-9;]+m")"
-check 'overspending: the percentage is NOT coloured' no \
-  "$(has "$O" "${ESC}\[38;2;243;139;168m[^m]*97%")"
-check 'overspending: no NaN anywhere in the output' no "$(has "$O" 'NaN')"
+check 'light bar: overspending digit is dark red #cf222e' yes \
+  "$(has "$O" "${ESC}\[38;2;207;34;46m-47↑${ESC}\[[0-9;]+m")"
+check 'light bar: no pastel red from the dark palette' no "$(has "$O" "${ESC}\[38;2;243;139;168m")"
+check 'light bar: the percentage is NOT coloured' no \
+  "$(has "$O" "${ESC}\[38;2;207;34;46m[^m]*97%")"
+check 'light bar: no NaN anywhere in the output' no "$(has "$O" 'NaN')"
 
-# Reserve: green digit.
 O=$(render 7d 0.50 42 iso)
-check 'reserve: digit and arrow wrapped in green' yes \
-  "$(has "$O" "${ESC}\[38;2;166;227;161m\+8↓${ESC}\[[0-9;]+m")"
+check 'light bar: reserve digit is dark green #1a7f37' yes \
+  "$(has "$O" "${ESC}\[38;2;26;127;55m\+8↓${ESC}\[[0-9;]+m")"
 
-# Exactly on the line: delta = 0 renders as ↓, so it is green. An edge, not a bug —
+# Exactly on the line: delta = 0 renders as ↓, so it takes the "under" colour. An edge, not a bug —
 # formatters.ts reads `delta < 0 ? "↑" : "↓"`, and zero falls to ↓.
 O=$(render 7d 0.50 50 iso)
-check 'exactly on the line: 0↓ is green, as every ↓ is' yes \
-  "$(has "$O" "${ESC}\[38;2;166;227;161m0↓${ESC}\[[0-9;]+m")"
+check 'light bar: 0↓ takes the under colour, as every ↓ does' yes \
+  "$(has "$O" "${ESC}\[38;2;26;127;55m0↓${ESC}\[[0-9;]+m")"
+
+# Dark bar: the pastel pair is the readable one there, and it is what must come back.
+O=$(render 7d 0.50 97 iso 3 probe_rate_limit.dark.config.json)
+check 'dark bar: overspending digit is pastel red #f38ba8' yes \
+  "$(has "$O" "${ESC}\[38;2;243;139;168m-47↑${ESC}\[[0-9;]+m")"
+check 'dark bar: no dark red from the light palette' no "$(has "$O" "${ESC}\[38;2;207;34;46m")"
+
+O=$(render 7d 0.50 42 iso 3 probe_rate_limit.dark.config.json)
+check 'dark bar: reserve digit is pastel green #a6e3a1' yes \
+  "$(has "$O" "${ESC}\[38;2;166;227;161m\+8↓${ESC}\[[0-9;]+m")"
+
+# Named outright in the config, the colour wins over whatever the background would have chosen.
+O=$(render 7d 0.50 97 iso 3 probe_rate_limit.override.config.json)
+check 'configured colour wins over the palette' yes "$(has "$O" "${ESC}\[38;2;255;0;255m-47↑")"
+O=$(render 7d 0.50 42 iso 3 probe_rate_limit.override.config.json)
+check 'configured colour wins for the reserve digit too' yes "$(has "$O" "${ESC}\[38;2;0;0;255m\+8↓")"
 
 echo "== colour goes through the colorSupport fork, not around it =="
 
 O=$(render 7d 0.50 97 iso 1)
 check 'ansi: digit wrapped in the basic code 31' yes "$(has "$O" "${ESC}\[31m-47↑")"
-check 'ansi: no raw truecolor on the pace digit' no "$(has "$O" "${ESC}\[38;2;243;139;168m")"
+check 'ansi: no raw truecolor on the pace digit' no "$(has "$O" "${ESC}\[38;2;207;34;46m")"
 
 O=$(render 7d 0.50 97 iso 2)
 check 'ansi256: digit wrapped in a palette code 38;5' yes "$(has "$O" "${ESC}\[38;5;[0-9]+m-47↑")"
-check 'ansi256: no raw truecolor on the pace digit' no "$(has "$O" "${ESC}\[38;2;243;139;168m")"
+check 'ansi256: no raw truecolor on the pace digit' no "$(has "$O" "${ESC}\[38;2;207;34;46m")"
 
 # none: the WHOLE output is checked, not just our own part. One escape in a line where nobody
 # else has colour is garbage on screen, no matter whose it is.
