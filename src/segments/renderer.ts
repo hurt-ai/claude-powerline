@@ -16,6 +16,11 @@ const PACE_UNDER_HEX = "#a6e3a1";
 /** Ahead of it — the week is being overspent. */
 const PACE_OVER_HEX = "#f38ba8";
 
+/** The two rate-limit windows the API reports on. Their length is the only thing that separates
+ * them, so both go through the same rendering. */
+const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Which Claude account this statusline runs under, by CLAUDE_CONFIG_DIR.
  * ~/.claude (or unset) -> "1" (default/work); ~/.claude-second -> "2" (personal).
@@ -114,8 +119,8 @@ import {
   formatTokenBreakdown,
   formatTimeSince,
   formatDuration,
-  formatTimeUntil,
-  formatWeekPace,
+  formatPace,
+  formatLimitTime,
 } from "../utils/formatters";
 import { getBudgetStatus } from "../utils/budget";
 import type {
@@ -680,33 +685,47 @@ export class SegmentRenderer {
     const show5h = config?.show5h !== false;
     const show7d = config?.show7d !== false;
     const showTime = config?.showTimeRemaining !== false;
+    const segFg = colors.rateLimitFg || colors.modelFg;
 
-    // 5h session limit
-    if (show5h && rateLimitInfo.session !== null) {
-      const pct = Math.round(rateLimitInfo.session);
-      const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.sessionResetsAt) : null;
-      const text = timeLeft
-        ? `${this.symbols.rate_limit_5h} ${pct}% (${timeLeft})`
-        : `${this.symbols.rate_limit_5h} ${pct}%`;
-      segments.push({
-        text,
-        bgColor: colors.rateLimitBg || colors.modelBg,
-        fgColor: colors.rateLimitFg || colors.modelFg,
-      });
-    }
+    // Both windows are the same segment with a different length; only that length differs.
+    const windows: Array<{
+      shown: boolean;
+      symbol: string;
+      utilization: number | null;
+      resetsAt: string | null;
+      windowMs: number;
+    }> = [
+      {
+        shown: show5h,
+        symbol: this.symbols.rate_limit_5h,
+        utilization: rateLimitInfo.session,
+        resetsAt: rateLimitInfo.sessionResetsAt,
+        windowMs: FIVE_HOURS_MS,
+      },
+      {
+        shown: show7d,
+        symbol: this.symbols.rate_limit_7d,
+        utilization: rateLimitInfo.week,
+        resetsAt: rateLimitInfo.weekResetsAt,
+        windowMs: SEVEN_DAYS_MS,
+      },
+    ];
 
-    // 7d week limit
-    if (show7d && rateLimitInfo.week !== null) {
-      const pct = Math.round(rateLimitInfo.week);
-      const timeLeft = showTime ? formatTimeUntil(rateLimitInfo.weekResetsAt) : null;
-      const pace = formatWeekPace(rateLimitInfo.week, rateLimitInfo.weekResetsAt);
-      const segFg = colors.rateLimitFg || colors.modelFg;
-      const head = pace
-        ? `${this.symbols.rate_limit_7d} ${pct}% ${this.colorizePace(pace, segFg)}`
-        : `${this.symbols.rate_limit_7d} ${pct}%`;
-      const text = timeLeft ? `${head} (${timeLeft})` : head;
+    for (const w of windows) {
+      if (!w.shown || w.utilization === null) continue;
+
+      const pct = Math.round(w.utilization);
+      const pace = formatPace(w.utilization, w.resetsAt, w.windowMs);
+      const time = showTime
+        ? formatLimitTime(w.utilization, w.resetsAt, w.windowMs)
+        : null;
+
+      const parts = [`${w.symbol} ${pct}%`];
+      if (pace) parts.push(this.colorizePace(pace, segFg));
+      if (time) parts.push(time);
+
       segments.push({
-        text,
+        text: parts.join(" "),
         bgColor: colors.rateLimitBg || colors.modelBg,
         fgColor: colors.rateLimitFg || colors.modelFg,
       });
@@ -731,7 +750,7 @@ export class SegmentRenderer {
    * same garbage by another route. Where there is no colour at all the digit stays plain — a
    * single escape in an otherwise escape-free line is worse than no colour.
    *
-   * The ARROW decides, not the sign. Below PACE_MIN_ELAPSED formatWeekPace returns the gap
+   * The ARROW decides, not the sign. Below PACE_MIN_ELAPSED formatPace returns the gap
    * without an arrow, and exactly on the line `delta = 0` renders as `↓`. Reading the sign
    * would colour the first case and mis-colour the second.
    */

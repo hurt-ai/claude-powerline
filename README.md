@@ -7,12 +7,28 @@
 >
 > ### What is added
 >
-> - **`rateLimit` segment** — the 5-hour window and the 7-day window with time to reset:
->   `⏱ 16% (3h39m) ⏳ 11% +15↓ (125h9m)`.
-> - **Pace figure** — `+15↓` is the gap in percentage points between the even burn line and what
->   was actually spent. `↓` means a reserve was built up, `↑` means the week is being overspent.
->   Below 15% of the window elapsed the arrow is omitted: early on the figure is noise.
-> - **Colour on the pace digit only** — green for `↓`, red for `↑`. Percentages and the time tail
+> - **`rateLimit` segment** — the 5-hour window and the 7-day window, each with a pace figure:
+>   `⏱ 33% +12↓ ⏳ 6% +49↓`.
+> - **Pace figure** — `+12↓` is the gap in percentage points between the even burn line and what
+>   was actually spent. `↓` means a reserve was built up, `↑` means the window is being overspent.
+>   Below 15% of the window elapsed nothing is printed but the percentage: that early, the figure
+>   is noise, and a bare digit with no arrow reads as a broken segment.
+> - **A time figure only when it changes a decision** — a permanent countdown answers nothing: at
+>   6% of a week spent, seventy-five hours to reset is a fact about the calendar. What a rate limit
+>   actually raises is whether the current burn outlasts the window, so:
+>
+>   | State | Printed | Reads as |
+>   |---|---|---|
+>   | a reserve | nothing | no decision to take |
+>   | burning too fast | `!1h13m` | at this rate the limit is gone in 1h13m, before the window resets |
+>   | 90% or more spent | `(2h45m)` | the forecast is beside the point; this is how long the wait is |
+>
+>   The two forms are deliberately different: `!` is time to the wall, brackets are time until
+>   reset. Spans over a day are counted in days — `2d8h`, never `56h50m`, which has to be divided
+>   in the head before it means anything. The rate is the average since the window opened, because
+>   the API hands out an accumulated percentage and nothing else; read it as "if it goes on as it
+>   has gone". `showTimeRemaining: false` turns the figure off entirely.
+> - **Colour on the pace digit only** — green for `↓`, red for `↑`. Percentages and the time figure
 >   keep the segment colour. The colour goes through the same colorSupport fork as the rest of the
 >   line, so a terminal without truecolor gets the palette it can read, and a terminal without
 >   colour gets a plain digit.
