@@ -1,0 +1,38 @@
+{
+  "_comment": "Конфиг ПРОБЫ probe_pace_color.sh, не рабочий. Свой, а не живой ~/.claude/claude-powerline.json: тот юзер правит по ходу дела, и проба разъезжалась бы с ним молча. Включён один сегмент лимита — предмет пробы; стиль, набор знаков и режим цвета те же, что в рабочем.",
+  "theme": "custom",
+  "display": {
+    "style": "powerline",
+    "charset": "unicode",
+    "colorCompatibility": "auto",
+    "autoWrap": true,
+    "lines": [
+      {
+        "segments": {
+          "rateLimit": {
+            "enabled": true,
+            "show5h": false,
+            "show7d": true
+          }
+        }
+      }
+    ]
+  },
+  "colors": {
+    "custom": {
+      "directory": { "bg": "#d0d7de", "fg": "#1f2328" },
+      "git": { "bg": "#eaeef2", "fg": "#24292f" },
+      "model": { "bg": "#ddf4ff", "fg": "#0550ae" },
+      "rateLimit": { "bg": "#fff1c2", "fg": "#7d4e00" },
+      "session": { "bg": "#eaeef2", "fg": "#24292f" },
+      "block": { "bg": "#eaeef2", "fg": "#24292f" },
+      "today": { "bg": "#eaeef2", "fg": "#24292f" },
+      "week": { "bg": "#eaeef2", "fg": "#24292f" },
+      "tmux": { "bg": "#d0d7de", "fg": "#1f2328" },
+      "context": { "bg": "#dafbe1", "fg": "#1a7f37" },
+      "metrics": { "bg": "#eaeef2", "fg": "#24292f" },
+      "version": { "bg": "#eaeef2", "fg": "#24292f" },
+      "warning": { "bg": "#cf222e", "fg": "#ffffff" }
+    }
+  }
+}
