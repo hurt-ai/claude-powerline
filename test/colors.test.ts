@@ -4,6 +4,7 @@ import {
   hexToAnsi,
   hexTo256Ansi,
   extractBgToFg,
+  isLightBackground,
 } from "../src/utils/colors";
 import { getTheme } from "../src/themes";
 
@@ -131,5 +132,43 @@ describe("Colors", () => {
       const noneTheme = getTheme("nord", "none");
       expect(noneTheme?.directory.bg).toBe(ansiTheme?.directory.bg);
     });
+  });
+});
+
+describe("isLightBackground", () => {
+  it("calls the cream a light theme puts under the rate limit light", () => {
+    expect(isLightBackground("#fff1c2")).toBe(true);
+  });
+
+  it("calls a dark bar dark", () => {
+    expect(isLightBackground("#3b3b52")).toBe(false);
+  });
+
+  it("weighs green heavier than blue, as luminance does", () => {
+    // Same channel value, opposite verdicts: pure green is bright, pure blue is not.
+    expect(isLightBackground("#00ff00")).toBe(true);
+    expect(isLightBackground("#0000ff")).toBe(false);
+  });
+
+  it("takes a hex with no hash", () => {
+    expect(isLightBackground("ffffff")).toBe(true);
+  });
+
+  // --- rejected input: an unreadable colour must not be read as light, which would flip the
+  // palette to dark text on an unknown bar ---
+  it("returns false for an undefined colour", () => {
+    expect(isLightBackground(undefined)).toBe(false);
+  });
+
+  it("returns false for a shorthand hex it cannot measure", () => {
+    expect(isLightBackground("#fff")).toBe(false);
+  });
+
+  it("returns false for a name rather than a hex", () => {
+    expect(isLightBackground("white")).toBe(false);
+  });
+
+  it("returns false for an ANSI escape mistaken for a colour", () => {
+    expect(isLightBackground("\u001b[38;2;255;241;194m")).toBe(false);
   });
 });

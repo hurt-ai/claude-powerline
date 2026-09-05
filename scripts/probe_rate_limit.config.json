@@ -1,0 +1,77 @@
+{
+  "_comment": "Config for the probe in probe_rate_limit.sh, not a working one. Deliberately not the live ~/.claude/claude-powerline.json: that one is edited as work goes on, and the probe would drift away from it silently. Both limit windows are enabled — which of them draws is decided by the data the probe writes; style, charset and colour mode match the real one.",
+  "theme": "custom",
+  "display": {
+    "style": "powerline",
+    "charset": "unicode",
+    "colorCompatibility": "auto",
+    "autoWrap": true,
+    "lines": [
+      {
+        "segments": {
+          "rateLimit": {
+            "enabled": true,
+            "show5h": true,
+            "show7d": true
+          }
+        }
+      }
+    ]
+  },
+  "colors": {
+    "custom": {
+      "directory": {
+        "bg": "#d0d7de",
+        "fg": "#1f2328"
+      },
+      "git": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "model": {
+        "bg": "#ddf4ff",
+        "fg": "#0550ae"
+      },
+      "rateLimit": {
+        "bg": "#fff1c2",
+        "fg": "#7d4e00"
+      },
+      "session": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "block": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "today": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "week": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "tmux": {
+        "bg": "#d0d7de",
+        "fg": "#1f2328"
+      },
+      "context": {
+        "bg": "#dafbe1",
+        "fg": "#1a7f37"
+      },
+      "metrics": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "version": {
+        "bg": "#eaeef2",
+        "fg": "#24292f"
+      },
+      "warning": {
+        "bg": "#cf222e",
+        "fg": "#ffffff"
+      }
+    }
+  }
+}

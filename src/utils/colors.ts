@@ -1,6 +1,28 @@
 import process from "node:process";
 import tty from "node:tty";
 
+/**
+ * Whether text on this background has to be dark to be read.
+ *
+ * Relative luminance per WCAG 2.x, sRGB linearised. The 0.5 line is where the contrast against
+ * a pastel foreground collapses: #a6e3a1 on the cream #fff1c2 measures about 1.4:1, which is
+ * legible on a screenshot and not on a screen.
+ */
+export function isLightBackground(hex: string | undefined): boolean {
+  if (!hex) return false;
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m || !m[1]) return false;
+  const n = parseInt(m[1], 16);
+  const channel = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const r = channel((n >> 16) & 0xff);
+  const g = channel((n >> 8) & 0xff);
+  const b = channel(n & 0xff);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+}
+
 export function hexToAnsi(hex: string, isBackground: boolean): string {
   if (
     isBackground &&
