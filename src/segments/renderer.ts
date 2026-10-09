@@ -26,16 +26,38 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Which Claude account this statusline runs under, by CLAUDE_CONFIG_DIR.
- * ~/.claude (or unset) -> "1" (default/work); ~/.claude-second -> "2" (personal).
- * Other custom config dir -> "?".
+ * Derived from the config dir, so a new account needs no change here:
+ * ~/.claude (or unset) -> "1"; ~/.claude-second -> "2"; ~/.claude-fourth -> "4";
+ * ~/.claude-2 -> "2"; ~/.claude-glm -> "G"; anything unreadable -> "?".
+ *
+ * The label follows the directory's own name, so adding an account needs no
+ * list kept in step by hand.
  */
+const ORDINAL_SUFFIXES: Record<string, string> = {
+  first: "1",
+  second: "2",
+  third: "3",
+  fourth: "4",
+  fifth: "5",
+  sixth: "6",
+  seventh: "7",
+  eighth: "8",
+  ninth: "9",
+};
+
 function accountLabel(): string {
   const env = process.env.CLAUDE_CONFIG_DIR;
   const home = homedir();
   const dir = env ? (env.split(",")[0]?.trim() || "") : "";
   if (dir === "" || dir === path.join(home, ".claude")) return "1";
-  if (dir === path.join(home, ".claude-second")) return "2";
-  return "?";
+
+  const name = path.basename(dir);
+  const suffix = name.startsWith(".claude-") ? name.slice(".claude-".length) : "";
+  if (suffix === "") return "?";
+  if (/^\d+$/.test(suffix)) return suffix;
+  const ordinal = ORDINAL_SUFFIXES[suffix.toLowerCase()];
+  if (ordinal) return ordinal;
+  return suffix[0]!.toUpperCase();
 }
 
 export interface SegmentConfig {
