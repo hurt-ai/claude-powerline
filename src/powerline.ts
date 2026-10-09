@@ -141,6 +141,21 @@ export class PowerlineRenderer {
     );
   }
 
+  /**
+   * Message count and last response time read the whole transcript; the token speed reads
+   * only its end. Read it all only when a metrics segment shows one of the first two.
+   */
+  private metricsNeeds(): { fullTranscript: boolean } {
+    const fullTranscript = this.config.display.lines.some((line) => {
+      const metrics = line.segments.metrics as
+        | { enabled?: boolean; showMessageCount?: boolean; showLastResponseTime?: boolean }
+        | undefined;
+      return !!metrics?.enabled &&
+        (metrics.showMessageCount !== false || metrics.showLastResponseTime === true);
+    });
+    return { fullTranscript };
+  }
+
   async generateStatusline(hookData: ClaudeHookData): Promise<string> {
     const usageInfo = this.needsSegmentInfo("session")
       ? await this.usageProvider.getUsageInfo(hookData.session_id, hookData)
@@ -171,7 +186,7 @@ export class PowerlineRenderer {
       : null;
 
     const metricsInfo = this.needsSegmentInfo("metrics")
-      ? await this.metricsProvider.getMetricsInfo(hookData.session_id, hookData)
+      ? await this.metricsProvider.getMetricsInfo(hookData.session_id, hookData, this.metricsNeeds())
       : null;
 
     if (this.config.display.autoWrap) {

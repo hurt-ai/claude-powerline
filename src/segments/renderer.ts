@@ -100,6 +100,7 @@ export interface MetricsSegmentConfig extends SegmentConfig {
   showMessageCount?: boolean;
   showLinesAdded?: boolean;
   showLinesRemoved?: boolean;
+  showTokenSpeed?: boolean;
 }
 
 export interface BlockSegmentConfig extends SegmentConfig {
@@ -451,6 +452,12 @@ export class SegmentRenderer {
           ? `${metricsInfo.lastResponseTime.toFixed(1)}s`
           : `${(metricsInfo.lastResponseTime / 60).toFixed(1)}m`;
       parts.push(`${this.symbols.metrics_last_response} ${lastResponseTime}`);
+    }
+
+    if (config?.showTokenSpeed && metricsInfo.lastTokenSpeed !== null) {
+      parts.push(
+        `${Math.round(metricsInfo.lastTokenSpeed)} t/s`
+      );
     }
 
     if (
