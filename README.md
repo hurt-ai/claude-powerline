@@ -40,6 +40,22 @@ read per account, with a pace figure that says whether you are ahead of or behin
   `<config dir>/.credentials.json`.
 - **Disk-backed limit cache** — the segment no longer disappears between calls when the API is
   slow to answer.
+- **Daily budget** (`showDailyBudget`, off by default) — the seven-day window read as seven days:
+  `☀ 63% +2.0d`. The percentage is today's spend against the day's norm, a seventh of the week,
+  so `100%` is a day's worth and `180%` is nearly two. The second figure is the reserve in days of
+  that norm: two idle days read `+2.0d`, spending ahead of the even line reads `-1.3d`. An
+  overspent day and a negative reserve take an orange warning colour, distinct from the pace's red
+  — a day over its share and a week over its line are different alarms.
+
+  Days are cut from the window, not the calendar: day 0 opens at `resets_at` minus seven days, so
+  a reset always falls on a day boundary and seven norms add up to the week. The reserve is capped
+  at the days left, since what is unspent at the reset is lost.
+
+  The API reports only the window's accumulated percentage, so today's spend is measured against
+  a baseline kept on disk per account: the last value seen on the previous day, or zero on the
+  window's first day. The first sight in the middle of a window has no morning to start from and
+  counts the day from that sight. The limit is shared by every client of the plan, so spending
+  from elsewhere before the first repaint of a day lands in the day before.
 
 ## Installing this fork
 
@@ -78,13 +94,14 @@ In your `claude-powerline.json`, inside a line's `segments`:
     "show5h": true,
     "show7d": true,
     "show7dSonnet": false,
-    "showTimeRemaining": true
+    "showTimeRemaining": true,
+    "showDailyBudget": false
   }
 }
 ```
 
 Colours for the segment are set like any other, under `colors.custom.rateLimit`, which also takes
-the two optional pace colours:
+the two optional pace colours and the daily budget's warning colour:
 
 ```json
 {
@@ -92,7 +109,8 @@ the two optional pace colours:
     "bg": "#fff1c2",
     "fg": "#7d4e00",
     "paceUnder": "#1a7f37",
-    "paceOver": "#cf222e"
+    "paceOver": "#cf222e",
+    "dailyWarn": "#8a3300"
   }
 }
 ```
