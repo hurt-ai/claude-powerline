@@ -30,6 +30,8 @@ export interface SegmentColor {
 export interface RateLimitColor extends SegmentColor {
   paceUnder?: string;
   paceOver?: string;
+  /** The daily budget's warning colour: an overspent day or a negative reserve. */
+  dailyWarn?: string;
 }
 
 export interface ColorTheme {
@@ -71,6 +73,7 @@ export interface PowerlineColors {
   rateLimitBgHex?: string;
   ratePaceUnderHex?: string;
   ratePaceOverHex?: string;
+  rateDailyWarnHex?: string;
   tmuxBg: string;
   tmuxFg: string;
   contextBg: string;

@@ -32,6 +32,7 @@ export const SYMBOLS = {
   version: "◈",
   rate_limit_5h: "⏱",
   rate_limit_7d: "⏳",
+  rate_limit_day: "☀",
 } as const;
 
 export const TEXT_SYMBOLS = {
@@ -66,5 +67,6 @@ export const TEXT_SYMBOLS = {
   version: "V",
   rate_limit_5h: "5h",
   rate_limit_7d: "7d",
+  rate_limit_day: "day",
 } as const;
 

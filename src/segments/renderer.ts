@@ -19,6 +19,12 @@ import {
 const PACE_ON_DARK = { under: "#a6e3a1", over: "#f38ba8" };
 const PACE_ON_LIGHT = { under: "#1a7f37", over: "#cf222e" };
 
+/** The daily budget's warning is orange, not the pace's red: an overspent DAY is a different alarm
+ * from an overspent WEEK, and the two sit side by side. Light: 4.7:1 on the sky blue the light theme
+ * gives this segment, 7.3:1 on cream; dark: 5.4:1 on #2d2d2d. Override with
+ * colors.custom.rateLimit.dailyWarn. */
+const DAILY_WARN = { onDark: "#f0883e", onLight: "#8a3300" };
+
 /** The two rate-limit windows the API reports on. Their length is the only thing that separates
  * them, so both go through the same rendering. */
 const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
@@ -121,6 +127,8 @@ export interface RateLimitSegmentConfig extends SegmentConfig {
   show7d?: boolean;
   show7dSonnet?: boolean;
   showTimeRemaining?: boolean;
+  /** Today's share of a seventh of the week, and the reserve in days of that norm. */
+  showDailyBudget?: boolean;
 }
 
 export interface VersionSegmentConfig extends SegmentConfig {}
@@ -148,6 +156,7 @@ import {
   formatPace,
   formatLimitTime,
 } from "../utils/formatters";
+import { formatDailyBudget } from "../utils/daily-budget";
 import { getBudgetStatus } from "../utils/budget";
 import type {
   UsageInfo,
@@ -191,6 +200,7 @@ export interface PowerlineSymbols {
   version: string;
   rate_limit_5h: string;
   rate_limit_7d: string;
+  rate_limit_day: string;
 }
 
 export interface SegmentData {
@@ -763,7 +773,36 @@ export class SegmentRenderer {
       });
     }
 
+    if (config?.showDailyBudget && rateLimitInfo.daily) {
+      const day = formatDailyBudget(rateLimitInfo.daily);
+      const light = isLightBackground(colors.rateLimitBgHex);
+      const warn = colors.rateDailyWarnHex || (light ? DAILY_WARN.onLight : DAILY_WARN.onDark);
+      const under =
+        colors.ratePaceUnderHex || (light ? PACE_ON_LIGHT.under : PACE_ON_DARK.under);
+      const today = day.todayOver ? this.colorize(day.today, warn, segFg) : day.today;
+      const reserve = this.colorize(day.reserve, day.reserveOver ? warn : under, segFg);
+      segments.push({
+        text: `${this.symbols.rate_limit_day} ${today} ${reserve}`,
+        bgColor: colors.rateLimitBg || colors.modelBg,
+        fgColor: colors.rateLimitFg || colors.modelFg,
+      });
+    }
+
     return segments;
+  }
+
+  /** One part of a segment in its own colour, through the same colorSupport fork as the line. */
+  private colorize(text: string, hex: string, segFg: string): string {
+    const colorMode = this.config.display.colorCompatibility || "auto";
+    const colorSupport = colorMode === "auto" ? getColorSupport() : colorMode;
+    if (colorSupport === "none") return text;
+    const toAnsi =
+      colorSupport === "ansi"
+        ? hexToBasicAnsi
+        : colorSupport === "ansi256"
+          ? hexTo256Ansi
+          : hexToAnsi;
+    return `${toAnsi(hex, false)}${text}${segFg}`;
   }
 
   /**

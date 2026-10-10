@@ -1,6 +1,7 @@
 import { getCredentials } from "../utils/credentials";
 import { debug } from "../utils/logger";
 import { CacheManager } from "../utils/cache";
+import { stepDay, DailyBudget, DayRecord } from "../utils/daily-budget";
 
 const API_TIMEOUT_MS = 5000;
 
@@ -26,6 +27,8 @@ export interface RateLimitInfo {
   weekResetsAt: string | null;
   weekSonnet: number | null;
   weekSonnetResetsAt: string | null;
+  /** Today against a seventh of the week, and the reserve in days; null unless asked for. */
+  daily: DailyBudget | null;
 }
 
 /**
@@ -40,6 +43,7 @@ export interface RateLimitInfo {
  * inside the TTL costs no network at all, and a failed fetch falls back to the last known value.
  */
 const CACHE_TYPE = "rate-limit" as const;
+const DAILY_CACHE_TYPE = "daily-budget" as const;
 
 interface CachedRateLimits {
   limits: UsageLimits;
@@ -51,7 +55,7 @@ let cacheTimestamp = 0;
 const CACHE_TTL_MS = 60000; // 60 seconds
 
 export class RateLimitProvider {
-  async getRateLimitInfo(): Promise<RateLimitInfo> {
+  async getRateLimitInfo(options: { daily?: boolean } = {}): Promise<RateLimitInfo> {
     try {
       const limits = await this.fetchUsageLimits();
 
@@ -63,6 +67,7 @@ export class RateLimitProvider {
           weekResetsAt: null,
           weekSonnet: null,
           weekSonnetResetsAt: null,
+          daily: null,
         };
       }
 
@@ -73,6 +78,12 @@ export class RateLimitProvider {
         weekResetsAt: limits.seven_day?.resets_at ?? null,
         weekSonnet: limits.seven_day_sonnet?.utilization ?? null,
         weekSonnetResetsAt: limits.seven_day_sonnet?.resets_at ?? null,
+        daily: options.daily
+          ? await this.dailyBudget(
+              limits.seven_day?.utilization ?? null,
+              limits.seven_day?.resets_at ?? null
+            )
+          : null,
       };
     } catch (error) {
       debug("Error getting rate limit info:", error);
@@ -83,7 +94,36 @@ export class RateLimitProvider {
         weekResetsAt: null,
         weekSonnet: null,
         weekSonnetResetsAt: null,
+        daily: null,
       };
+    }
+  }
+
+  /**
+   * One step of the day record: read it, advance it to this repaint, write it back only when it
+   * moved. Every repaint of every head runs this, so an unchanged record is not rewritten.
+   */
+  private async dailyBudget(
+    utilization: number | null,
+    resetsAt: string | null
+  ): Promise<DailyBudget | null> {
+    try {
+      const prev = (await CacheManager.getUsageCache(DAILY_CACHE_TYPE)) as DayRecord | null;
+      const { budget, record } = stepDay(utilization, resetsAt, prev, Date.now());
+      if (
+        record &&
+        (!prev ||
+          prev.resetsAt !== record.resetsAt ||
+          prev.dayStart !== record.dayStart ||
+          prev.baseline !== record.baseline ||
+          prev.lastUtil !== record.lastUtil)
+      ) {
+        await CacheManager.setUsageCache(DAILY_CACHE_TYPE, record);
+      }
+      return budget;
+    } catch (error) {
+      debug("Failed to compute the daily budget:", error);
+      return null;
     }
   }
 
