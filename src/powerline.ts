@@ -156,6 +156,16 @@ export class PowerlineRenderer {
     return { fullTranscript };
   }
 
+  /** The daily budget keeps a record on disk between repaints; it is kept only when shown. */
+  private dailyBudgetShown(): boolean {
+    return this.config.display.lines.some((line) => {
+      const rateLimit = line.segments.rateLimit as
+        | { enabled?: boolean; showDailyBudget?: boolean }
+        | undefined;
+      return !!rateLimit?.enabled && rateLimit.showDailyBudget === true;
+    });
+  }
+
   async generateStatusline(hookData: ClaudeHookData): Promise<string> {
     const usageInfo = this.needsSegmentInfo("session")
       ? await this.usageProvider.getUsageInfo(hookData.session_id, hookData)
@@ -174,7 +184,7 @@ export class PowerlineRenderer {
       : null;
 
     const rateLimitInfo = this.needsSegmentInfo("rateLimit")
-      ? await this.rateLimitProvider.getRateLimitInfo()
+      ? await this.rateLimitProvider.getRateLimitInfo({ daily: this.dailyBudgetShown() })
       : null;
 
     const contextInfo = this.needsSegmentInfo("context")
@@ -669,6 +679,7 @@ export class PowerlineRenderer {
       week_cost: symbolSet.week_cost,
       rate_limit_5h: symbolSet.rate_limit_5h,
       rate_limit_7d: symbolSet.rate_limit_7d,
+      rate_limit_day: symbolSet.rate_limit_day,
       context_time: symbolSet.context_time,
       metrics_response: symbolSet.metrics_response,
       metrics_last_response: symbolSet.metrics_last_response,
@@ -791,6 +802,7 @@ export class PowerlineRenderer {
       rateLimitBgHex: colorTheme.rateLimit?.bg ?? colorTheme.model.bg,
       ratePaceUnderHex: colorTheme.rateLimit?.paceUnder,
       ratePaceOverHex: colorTheme.rateLimit?.paceOver,
+      rateDailyWarnHex: colorTheme.rateLimit?.dailyWarn,
       tmuxBg: tmux.bg,
       tmuxFg: tmux.fg,
       contextBg: context.bg,
