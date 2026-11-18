@@ -4,20 +4,7 @@ import type { PowerlineColors } from "../themes";
 import type { PowerlineConfig } from "../config/loader";
 import type { BlockInfo } from "./block";
 import { homedir } from "node:os";
-import {
-  getColorSupport,
-  isLightBackground,
-  hexToAnsi,
-  hexTo256Ansi,
-  hexToBasicAnsi,
-} from "../utils/colors";
 
-/** The pace digit's two palettes. Which one is used follows the segment's background, because a
- * pastel green that reads on a dark bar is invisible on a light one — measured at ~1.4:1 against
- * the cream #fff1c2 that a light theme puts under this segment. Either colour can be overridden
- * per theme through colors.custom.rateLimit.paceUnder / .paceOver. */
-const PACE_ON_DARK = { under: "#a6e3a1", over: "#f38ba8" };
-const PACE_ON_LIGHT = { under: "#1a7f37", over: "#cf222e" };
 
 /** The two rate-limit windows the API reports on. Their length is the only thing that separates
  * them, so both go through the same rendering. */
@@ -145,7 +132,6 @@ import {
   formatTokenBreakdown,
   formatTimeSince,
   formatDuration,
-  formatPace,
   formatLimitTime,
 } from "../utils/formatters";
 import { getBudgetStatus } from "../utils/budget";
@@ -717,7 +703,6 @@ export class SegmentRenderer {
     const show5h = config?.show5h !== false;
     const show7d = config?.show7d !== false;
     const showTime = config?.showTimeRemaining !== false;
-    const segFg = colors.rateLimitFg || colors.modelFg;
 
     // Both windows are the same segment with a different length; only that length differs.
     const windows: Array<{
@@ -747,13 +732,11 @@ export class SegmentRenderer {
       if (!w.shown || w.utilization === null) continue;
 
       const pct = Math.round(w.utilization);
-      const pace = formatPace(w.utilization, w.resetsAt, w.windowMs);
       const time = showTime
         ? formatLimitTime(w.utilization, w.resetsAt, w.windowMs)
         : null;
 
       const parts = [`${w.symbol} ${pct}%`];
-      if (pace) parts.push(this.colorizePace(pace, segFg, colors));
       if (time) parts.push(time);
 
       segments.push({
@@ -764,54 +747,6 @@ export class SegmentRenderer {
     }
 
     return segments;
-  }
-
-  /**
-   * The pace digit is the only part of a segment that carries a colour of its own.
-   *
-   * The value it returns to is `segFg` VERBATIM, never a re-conversion of it. Fields of
-   * PowerlineColors are ALREADY ANSI strings — powerline.ts builds them through hexToAnsi
-   * before the renderer ever sees them. Feeding one back in parses "\x1b[38;2;125;78;0m" as a
-   * hex triple: `parseInt("[3", 16)` is NaN, and out comes `\x1b[38;2;NaN;8;2m`, which the
-   * terminal cannot read and prints as text. That also widened the line, because stripAnsi
-   * only removes `ESC[<digits and ;>m` and a sequence with letters in it counts as visible
-   * characters. Caught on screen 2026-08-26, across all three accounts at once.
-   *
-   * The colour comes through the same colorSupport fork as the rest of the line (the idiom is
-   * powerline.ts:formatSegment): a truecolor escape on a terminal that cannot read one is the
-   * same garbage by another route. Where there is no colour at all the digit stays plain — a
-   * single escape in an otherwise escape-free line is worse than no colour.
-   *
-   * The ARROW decides, not the sign. Below PACE_MIN_ELAPSED formatPace returns the gap
-   * without an arrow, and exactly on the line `delta = 0` renders as `↓`. Reading the sign
-   * would colour the first case and mis-colour the second.
-   */
-  private colorizePace(
-    pace: string,
-    segFg: string,
-    colors: PowerlineColors
-  ): string {
-    const base = isLightBackground(colors.rateLimitBgHex)
-      ? PACE_ON_LIGHT
-      : PACE_ON_DARK;
-    const over = colors.ratePaceOverHex || base.over;
-    const under = colors.ratePaceUnderHex || base.under;
-
-    const hex = pace.includes("↑") ? over : pace.includes("↓") ? under : null;
-    if (!hex) return pace;
-
-    const colorMode = this.config.display.colorCompatibility || "auto";
-    const colorSupport = colorMode === "auto" ? getColorSupport() : colorMode;
-    if (colorSupport === "none") return pace;
-
-    const toAnsi =
-      colorSupport === "ansi"
-        ? hexToBasicAnsi
-        : colorSupport === "ansi256"
-          ? hexTo256Ansi
-          : hexToAnsi;
-
-    return `${toAnsi(hex, false)}${pace}${segFg}`;
   }
 
   private getDisplayDirectoryName(

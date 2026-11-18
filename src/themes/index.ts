@@ -22,15 +22,6 @@ export interface SegmentColor {
   fg: string;
 }
 
-/**
- * The rate-limit segment carries two colours nobody else has: the pace digit's, which must
- * differ from its surroundings to be read at all. Both are optional — left out, the pair is
- * chosen from the segment's own background (see renderer.ts:pacePalette).
- */
-export interface RateLimitColor extends SegmentColor {
-  paceUnder?: string;
-  paceOver?: string;
-}
 
 export interface ColorTheme {
   directory: SegmentColor;
@@ -40,7 +31,7 @@ export interface ColorTheme {
   block: SegmentColor;
   today: SegmentColor;
   week?: SegmentColor;
-  rateLimit?: RateLimitColor;
+  rateLimit?: SegmentColor;
   tmux: SegmentColor;
   context: SegmentColor;
   metrics: SegmentColor;
@@ -66,11 +57,6 @@ export interface PowerlineColors {
   weekFg?: string;
   rateLimitBg?: string;
   rateLimitFg?: string;
-  /** The segment background as HEX, not as an escape: the pace palette is picked from its
-   * brightness, and an ANSI string cannot be measured for that. */
-  rateLimitBgHex?: string;
-  ratePaceUnderHex?: string;
-  ratePaceOverHex?: string;
   tmuxBg: string;
   tmuxFg: string;
   contextBg: string;
